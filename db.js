@@ -10,8 +10,8 @@ function setupDatabase(dbPath = 'Energydata.db') {
     }
 
     // Otherwise, create a new connection.
-    const options = { verbose: console.log };
-    db = new Database(dbPath, options);
+    // Removed verbose logging to prevent SQL statements from being printed
+    db = new Database(dbPath);
 
     console.log('Database connection established.');
 

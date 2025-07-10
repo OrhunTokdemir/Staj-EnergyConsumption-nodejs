@@ -11,6 +11,8 @@ credentials.json
 
 # Database files
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 Energydata.db
