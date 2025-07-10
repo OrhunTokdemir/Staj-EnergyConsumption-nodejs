@@ -1,0 +1,25 @@
+{
+  "name": "staj-node1",
+  "version": "1.0.0",
+  "description": "Energy-api",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OrhunTokdemir/staj-node1.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/OrhunTokdemir/staj-node1/issues"
+  },
+  "homepage": "https://github.com/OrhunTokdemir/staj-node1#readme",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "better-sqlite3": "^12.2.0",
+    "qs": "^6.14.0"
+  }
+}
