@@ -17,6 +17,7 @@ function setupDatabase(dbPath = 'Energydata.db') {
 
     // Run the initial schema setup.
     db.exec(`CREATE TABLE IF NOT EXISTS K1(
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
         ADDRESS TEXT,
         ANNUALAVERAGECONSUMPTION REAL,
         BILATERALCONSUMERGROUP TEXT,
