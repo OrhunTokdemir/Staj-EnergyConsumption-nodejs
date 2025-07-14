@@ -6,6 +6,18 @@ require('dotenv').config();
 const setupDatabase = require('./db.js'); // Import the setup function
 const { insertEnergyData, closeDatabase } = require('./dbMethods.js');
 const { sendEmail } = require('./message');
+const setupLogger = require('./logger'); // Import the logger
+
+// Set up logger to write to file named with current date and time
+const today = new Date();
+const restoreConsole = setupLogger(today);
+
+// Register cleanup for the logger when the application exits
+process.on('exit', () => {
+  const message = restoreConsole();
+  // Use the original console since our override is removed by restoreConsole
+  console.log(message);
+});
 
 // 1. Call the function to get the single DB instance
 const db = setupDatabase();
@@ -195,16 +207,20 @@ function authenticateAndProcessUser(username, userType) {
 process.on('SIGINT', () => {
   console.log('Application shutting down, cleaning up...');
   closeDatabase(db);
+  const message = restoreConsole();
+  console.log(message);
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('Application terminated, cleaning up...');
   closeDatabase(db);
+  const message = restoreConsole();
+  console.log(message);
   process.exit(0);
 });
 
-const job = schedule.scheduleJob('16 * 14 * *', function(){
+//const job = schedule.scheduleJob('16 * 14 * *', function(){
   // Your code here will run at midnight (00:00) on the 14th day of every month
   
   console.log('Starting data fetching process for both users...');
@@ -223,4 +239,4 @@ const job = schedule.scheduleJob('16 * 14 * *', function(){
     .catch(error => {
       console.error('Error during user processing:', error.message);
     });
-});
+//});
