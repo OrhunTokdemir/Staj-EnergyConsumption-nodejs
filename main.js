@@ -20,7 +20,7 @@ function authenticate(username, password) {
     url: 'https://cas.epias.com.tr/cas/v1/tickets?format=text',
     headers: { 
       'Content-Type': 'application/x-www-form-urlencoded', 
-      'Cookie': 'TS01f5a18f=01cbc7c0b290621404c1faf18d481d119cc9f680d3b62309fd97f0b40ba1db0c1376aceaeba1788b0359e245da715fb6dceb76ab6d'
+      
     },
     data: data
   };
@@ -57,7 +57,7 @@ function fetchEnergyData(ticket, userType, pageNumber = 1, pageSize = 10) {
     headers: { 
       'TGT': ticket,
       'Content-Type': 'application/json', 
-      'Cookie': 'TS0107156a=01cbc7c0b29e8ec2b81d49fce69777510d6410257a2c108ca4a2ffd4602ddce499db5f0599401fbd413b609133ef2f4c982a2d416f'
+      
     },
     data: data
   };
@@ -100,7 +100,7 @@ function getTotalCount(ticket) {
     headers: { 
       'TGT': ticket,
       'Content-Type': 'application/json', 
-      'Cookie': 'TS0107156a=01cbc7c0b29e8ec2b81d49fce69777510d6410257a2c108ca4a2ffd4602ddce499db5f0599401fbd413b609133ef2f4c982a2d416f'
+      
     },
     data: data
   };

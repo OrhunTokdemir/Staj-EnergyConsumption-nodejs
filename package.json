@@ -8,15 +8,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OrhunTokdemir/staj-node1.git"
+    "url": "git+https://github.com/OrhunTokdemir/Staj-EnergyConsumption-nodejs.git"
   },
-  "keywords": [],
+  "keywords": ["energy", "epias", "nodejs"],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/OrhunTokdemir/staj-node1/issues"
+    "url": "https://github.com/OrhunTokdemir/Staj-EnergyConsumption-nodejs/issues"
   },
-  "homepage": "https://github.com/OrhunTokdemir/staj-node1#readme",
+  "homepage": "https://github.com/OrhunTokdemir/Staj-EnergyConsumption-nodejs#readme",
   "dependencies": {
     "axios": "^1.10.0",
     "better-sqlite3": "^12.2.0",
