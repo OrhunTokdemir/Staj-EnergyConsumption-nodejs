@@ -1,8 +1,10 @@
 const axios = require('axios');
 const qs = require('qs');
 const fs = require('fs'); // Add fs module to read files
+require('dotenv').config();
 const setupDatabase = require('./db.js'); // Import the setup function
 const { insertEnergyData } = require('./dbMethods.js');
+const { sendEmail } = require('./message');
 
 // 1. Call the function to get the single DB instance
 const db = setupDatabase();
@@ -27,7 +29,7 @@ function authenticate(username, password) {
 
   return axios.request(config)
     .then((response) => {
-      console.log(`Authentication successful for user: ${username}`);
+      console.log(`Authentication successful for user`);
       return response.data; // Return the ticket
     })
     .catch((error) => {
@@ -126,7 +128,7 @@ function processUserData(ticket, userType, totalCount, pageSize) {
   // Process pages sequentially instead of all at once
   let currentPage = 1;
   let errorCount = 0; // Move errorCount outside so it persists across calls
-  
+  const EmailRecipient = process.env.EMAIL_RECIPIENT;
   function processNextPage() {
     if (currentPage <= totalPages) {
       console.log(`Processing ${userType} page ${currentPage}...`);
@@ -141,6 +143,7 @@ function processUserData(ticket, userType, totalCount, pageSize) {
           errorCount++;
           if (errorCount >= 5) {
             console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
+            sendEmail(EmailRecipient, 'API Error Notification', `Too many errors encountered while processing ${userType}. Please check the API status.`);
             return Promise.resolve(); // Stop further processing
           }
           currentPage++; // Skip to next page even if this one fails

@@ -10,7 +10,11 @@
     "type": "git",
     "url": "git+https://github.com/OrhunTokdemir/Staj-EnergyConsumption-nodejs.git"
   },
-  "keywords": ["energy", "epias", "nodejs"],
+  "keywords": [
+    "energy",
+    "epias",
+    "nodejs"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
@@ -20,6 +24,7 @@
   "dependencies": {
     "axios": "^1.10.0",
     "better-sqlite3": "^12.2.0",
+    "dotenv": "^17.2.0",
     "node-schedule": "^2.1.1",
     "nodemailer": "^7.0.5",
     "qs": "^6.14.0"
