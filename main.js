@@ -204,7 +204,7 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-const job = schedule.scheduleJob('55 * 14 * *', function(){
+const job = schedule.scheduleJob('16 * 14 * *', function(){
   // Your code here will run at midnight (00:00) on the 14th day of every month
   
   console.log('Starting data fetching process for both users...');

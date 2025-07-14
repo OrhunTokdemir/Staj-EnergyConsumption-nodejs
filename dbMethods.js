@@ -1,8 +1,9 @@
 function insertEnergyData(db, items, kullanici) {
     return new Promise((resolve, reject) => {
         try {
+            // Changed to INSERT OR IGNORE to skip duplicates
             const insert = db.prepare(`
-                INSERT INTO K1 (
+                INSERT OR IGNORE INTO K1 (
                     ADDRESS, ANNUALAVERAGECONSUMPTION, BILATERALCONSUMERGROUP, CITYID, CITYNAME,
                     CONNECTIONPOSITION, CONSUMPTINPOINTEIC, CONSUMPTIONPOINTID, CONTRACTPOWER,
                     CUSTOMERNO, DEMANDDIRECTION, DEMANDID, DEMANDSTATUS, DEMANDTYPE, DESCRIPTION,
@@ -52,10 +53,18 @@ function insertEnergyData(db, items, kullanici) {
                     kullanici
                 ];
                 
-                insert.run(...values);
+                try {
+                    const result = insert.run(...values);
+                    // Track the changes (1 if inserted, 0 if ignored due to UNIQUE constraint)
+                    if (result.changes === 0) {
+                        console.log(`Skipped duplicate record: ${item.uniqueCode} - ${item.periodDate}`);
+                    }
+                } catch (err) {
+                    console.error(`Error inserting record ${item.uniqueCode}: ${err.message}`);
+                }
             });
             
-            console.log(`Successfully inserted ${items.length} records into database`);
+            console.log(`Data insertion process completed for ${kullanici}`);
             resolve();
         } catch (error) {
             console.error('Database insertion error:', error.message);

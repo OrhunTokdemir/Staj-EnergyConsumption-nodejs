@@ -53,7 +53,8 @@ function setupDatabase(dbPath = 'Energydata.db') {
         UNIQUECODE TEXT, -- primary kod konusunda emin değilim, farkli zamanlarda alinan ornekler olabilir
         USAGETYPE TEXT,
         KULLANICI TEXT,
-        CREATEDTIME TEXT DEFAULT (datetime('now','localtime'))
+        CREATEDTIME TEXT DEFAULT (datetime('now','localtime')),
+        UNIQUE(UNIQUECODE, PERIODDATE, KULLANICI)
     )`);
 
     // Set pragma for performance.
