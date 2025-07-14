@@ -125,6 +125,7 @@ function processUserData(ticket, userType, totalCount, pageSize) {
   
   // Process pages sequentially instead of all at once
   let currentPage = 1;
+  let errorCount = 0; // Move errorCount outside so it persists across calls
   
   function processNextPage() {
     if (currentPage <= totalPages) {
@@ -137,7 +138,12 @@ function processUserData(ticket, userType, totalCount, pageSize) {
         })
         .catch(error => {
           console.error(`Error processing ${userType} page ${currentPage}:`, error.message);
-          currentPage++;
+          errorCount++;
+          if (errorCount >= 5) {
+            console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
+            return Promise.resolve(); // Stop further processing
+          }
+          currentPage++; // Skip to next page even if this one fails
           return processNextPage(); // Continue with next page even if this one fails
         });
     } else {
