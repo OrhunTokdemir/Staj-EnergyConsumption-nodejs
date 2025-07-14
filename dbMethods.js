@@ -64,9 +64,33 @@ function insertEnergyData(db, items, kullanici) {
     });
 }
 
-// Helper function
+// Helper function to safely get nested values
 function getValue(obj, key, subKey) {
     return obj[key] && obj[key][subKey] ? obj[key][subKey] : null;
 }
 
-module.exports = { insertEnergyData };
+// Function to close database connection properly
+function closeDatabase(db) {
+  if (db) {
+    // Run WAL checkpoint to commit changes
+    try {
+      db.pragma('wal_checkpoint(FULL)');
+      console.log('WAL checkpoint completed');
+    } catch (err) {
+      console.error('Error during WAL checkpoint:', err.message);
+    }
+    
+    // Close the database
+    try {
+      db.close();
+      console.log('Database connection closed properly');
+    } catch (err) {
+      console.error('Error closing database:', err.message);
+    }
+  }
+}
+
+module.exports = {
+    insertEnergyData,
+    closeDatabase
+};

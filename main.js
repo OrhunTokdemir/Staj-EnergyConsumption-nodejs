@@ -1,9 +1,10 @@
 const axios = require('axios');
 const qs = require('qs');
 const fs = require('fs'); // Add fs module to read files
+const schedule = require('node-schedule');
 require('dotenv').config();
 const setupDatabase = require('./db.js'); // Import the setup function
-const { insertEnergyData } = require('./dbMethods.js');
+const { insertEnergyData, closeDatabase } = require('./dbMethods.js');
 const { sendEmail } = require('./message');
 
 // 1. Call the function to get the single DB instance
@@ -39,7 +40,7 @@ function authenticate(username, password) {
 }
 
 // Function to fetch data from the API and insert it into the database
-function fetchEnergyData(ticket, userType, pageNumber = 1, pageSize = 10) {
+function fetchEnergyData(ticket,userType, pageNumber = 1, pageSize = 10) {
   let data = JSON.stringify({
     "periodDate": "2025-07-01T00:00:00+03:00",
     "page": {
@@ -190,17 +191,36 @@ function authenticateAndProcessUser(username, userType) {
     });
 }
 
-// Process both users sequentially
-console.log('Starting data fetching process for both users...');
-authenticateAndProcessUser(USERNAMEK1, 'K1')
-  .then(() => {
-    console.log('K1 user data processing completed, starting K2...');
-    return authenticateAndProcessUser(USERNAMEK2, 'K2');
-  })
-  .then(() => {
-    console.log('All users processed successfully!');
-  })
-  .catch(error => {
-    console.error('Error during user processing:', error.message);
-  });
+// Set up a cleanup function for when the app is shutting down
+process.on('SIGINT', () => {
+  console.log('Application shutting down, cleaning up...');
+  closeDatabase(db);
+  process.exit(0);
+});
 
+process.on('SIGTERM', () => {
+  console.log('Application terminated, cleaning up...');
+  closeDatabase(db);
+  process.exit(0);
+});
+
+const job = schedule.scheduleJob('55 * 14 * *', function(){
+  // Your code here will run at midnight (00:00) on the 14th day of every month
+  
+  console.log('Starting data fetching process for both users...');
+  authenticateAndProcessUser(USERNAMEK1, 'K1')
+    .then(() => {
+      console.log('K1 user data processing completed, starting K2...');
+      return authenticateAndProcessUser(USERNAMEK2, 'K2');
+    })
+    .then(() => {
+      console.log('All users processed successfully!');
+      
+      // Option: Close the database after each scheduled run
+      // If you want to keep the connection open between runs, comment this out
+      closeDatabase(db);
+    })
+    .catch(error => {
+      console.error('Error during user processing:', error.message);
+    });
+});
