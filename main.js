@@ -7,20 +7,15 @@ const setupDatabase = require('./db.js'); // Import the setup function
 const { insertEnergyData, closeDatabase } = require('./dbMethods.js');
 const { sendEmail } = require('./message');
 const setupLogger = require('./logger'); // Import the logger
+const { setPeriodDate } = require('./time.js');
 
-// Set up logger to write to file named with current date and time
-const today = new Date();
-const restoreConsole = setupLogger(today);
-
-// Register cleanup for the logger when the application exits
-process.on('exit', () => {
-  const message = restoreConsole();
-  // Use the original console since our override is removed by restoreConsole
-  console.log(message);
-});
+// Store original console for potential restoration
+let originalConsole = console;
 
 // 1. Call the function to get the single DB instance
 const db = setupDatabase();
+
+
 
 // Function to authenticate with the EPIAS API and get a ticket
 function authenticate(username, password) {
@@ -54,7 +49,7 @@ function authenticate(username, password) {
 // Function to fetch data from the API and insert it into the database
 function fetchEnergyData(ticket,userType, pageNumber = 1, pageSize = 10) {
   let data = JSON.stringify({
-    "periodDate": "2025-07-01T00:00:00+03:00",
+    "periodDate": setPeriodDate(), // Use dynamic date
     "page": {
       "number": pageNumber,
       "size": pageSize,
@@ -97,7 +92,7 @@ function fetchEnergyData(ticket,userType, pageNumber = 1, pageSize = 10) {
 // Function to get the total count of records
 function getTotalCount(ticket) {
   let data = JSON.stringify({
-    "periodDate": "2025-07-01T00:00:00+03:00",
+    "periodDate": setPeriodDate(), // Use dynamic date
     "page": {
       "number": 1,
       "size": 1, // We only need one record to get the total count
@@ -153,12 +148,23 @@ function processUserData(ticket, userType, totalCount, pageSize) {
         })
         .catch(error => {
           console.error(`Error processing ${userType} page ${currentPage}:`, error.message);
-          errorCount++;
-          if (errorCount >= 5) {
-            console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
-            sendEmail(EmailRecipient, 'API Error Notification', `Too many errors encountered while processing ${userType}. Please check the API status.`);
-            return Promise.resolve(); // Stop further processing
+          
+          // Don't count database duplicate/unique constraint errors as real errors
+          const isDuplicateError = error.message.includes('UNIQUE constraint') || 
+                                 error.message.includes('duplicate') ||
+                                 error.message.includes('already exists');
+          
+          if (!isDuplicateError) {
+            errorCount++;
+            if (errorCount >= 5) {
+              console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
+              sendEmail(EmailRecipient, 'API Error Notification', `Too many errors encountered while processing ${userType}. Please check the API status.`);
+              return Promise.resolve(); // Stop further processing
+            }
+          } else {
+            console.log(`Skipping duplicate record error for ${userType} page ${currentPage}, continuing...`);
           }
+          
           currentPage++; // Skip to next page even if this one fails
           return processNextPage(); // Continue with next page even if this one fails
         });
@@ -207,36 +213,169 @@ function authenticateAndProcessUser(username, userType) {
 process.on('SIGINT', () => {
   console.log('Application shutting down, cleaning up...');
   closeDatabase(db);
-  const message = restoreConsole();
-  console.log(message);
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('Application terminated, cleaning up...');
   closeDatabase(db);
-  const message = restoreConsole();
-  console.log(message);
   process.exit(0);
 });
 
-const job = schedule.scheduleJob('16 * 14 * *', function(){
-  // Your code here will run at midnight (00:00) on the 14th day of every month
+const job = schedule.scheduleJob('0 * 1 16 * *', function(){
+  // This runs at midnight (00:00) on the 14th day of every month
   
+  // Set up logger with current date/time for this specific run
+  const jobStartTime = new Date();
+  const restoreConsole = setupLogger(jobStartTime);
+  
+  console.log('=== SCHEDULED JOB STARTED ===');
+  console.log('Job execution time:', jobStartTime.toISOString());
   console.log('Starting data fetching process for both users...');
-  authenticateAndProcessUser(USERNAMEK1, 'K1')
+  
+  // Create a fresh database connection for this monthly run
+  const monthlyDb = setupDatabase();
+  
+  // Modified function to use the fresh database connection
+  function authenticateAndProcessUserMonthly(username, userType) {
+    return authenticate(username, PASSWORD)
+      .then(ticket => {
+        console.log(`Got authentication ticket for ${userType}, getting total count...`);
+        return getTotalCount(ticket).then(totalCount => {
+          const pageSize = 10;
+          return processUserDataMonthly(ticket, userType, totalCount, pageSize, monthlyDb);
+        });
+      })
+      .catch(error => {
+        console.error(`Authentication or processing failed for ${userType}:`, error.message);
+        throw error;
+      });
+  }
+  
+  // Modified function to use the fresh database connection
+  function processUserDataMonthly(ticket, userType, totalCount, pageSize, dbConnection) {
+    const totalPages = Math.ceil(totalCount / pageSize);
+    
+    console.log(`Processing ${userType} - Total records: ${totalCount}, Total pages: ${totalPages}`);
+    
+    // Process pages sequentially instead of all at once
+    let currentPage = 1;
+    let errorCount = 0;
+    const EmailRecipient = process.env.EMAIL_RECIPIENT;
+    
+    function processNextPage() {
+      if (currentPage <= totalPages) {
+        console.log(`Processing ${userType} page ${currentPage}...`);
+        return fetchEnergyDataMonthly(ticket, userType, currentPage, pageSize, dbConnection)
+          .then(items => {
+            console.log(`${userType} page ${currentPage} processed with ${items.length} records`);
+            currentPage++;
+            return processNextPage();
+          })
+          .catch(error => {
+            console.error(`Error processing ${userType} page ${currentPage}:`, error.message);
+            
+            // Don't count database duplicate/unique constraint errors as real errors
+            const isDuplicateError = error.message.includes('UNIQUE constraint') || 
+                                   error.message.includes('duplicate') ||
+                                   error.message.includes('already exists');
+            
+            if (!isDuplicateError) {
+              errorCount++;
+              if (errorCount >= 5) {
+                console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
+                sendEmail(EmailRecipient, 'API Error Notification', `Too many errors encountered while processing ${userType}. Please check the API status.`);
+                return Promise.resolve();
+              }
+            } else {
+              console.log(`Skipping duplicate record error for ${userType} page ${currentPage}, continuing...`);
+            }
+            
+            currentPage++;
+            return processNextPage();
+          });
+      } else {
+        console.log(`All pages processed successfully for ${userType}!`);
+        return Promise.resolve();
+      }
+    }
+    
+    return processNextPage();
+  }
+  
+  // Modified function to use the fresh database connection
+  function fetchEnergyDataMonthly(ticket, userType, pageNumber, pageSize, dbConnection) {
+    let data = JSON.stringify({
+      "periodDate": setPeriodDate(),
+      "page": {
+        "number": pageNumber,
+        "size": pageSize,
+        "sort": {
+          "direction": "DESC",
+          "field": "periodDate"
+        }
+      }
+    });
+
+    let config = {
+      method: 'post',
+      maxBodyLength: Infinity,
+      url: 'https://epys.epias.com.tr/demand/v1/pre-notification/supplier/query',
+      headers: { 
+        'TGT': ticket,
+        'Content-Type': 'application/json', 
+      },
+      data: data
+    };
+
+    return axios.request(config)
+      .then((response) => {
+        const items = response.data.body.content.items;
+
+        // Wait for the database insertion to complete using the fresh connection
+        return insertEnergyData(dbConnection, items, userType)
+          .then(() => {
+            console.log(`Data insertion process completed for ${userType}.`);
+            return items;
+          });
+      })
+      .catch((error) => {
+        console.error(`Error fetching energy data for ${userType}:`, error.message);
+        throw error;
+      });
+  }
+  
+  authenticateAndProcessUserMonthly(USERNAMEK1, 'K1')
     .then(() => {
       console.log('K1 user data processing completed, starting K2...');
-      return authenticateAndProcessUser(USERNAMEK2, 'K2');
+      return authenticateAndProcessUserMonthly(USERNAMEK2, 'K2');
     })
     .then(() => {
       console.log('All users processed successfully!');
+      console.log('=== SCHEDULED JOB COMPLETED ===');
       
-      // Option: Close the database after each scheduled run
-      // If you want to keep the connection open between runs, comment this out
-      closeDatabase(db);
+      // Close the monthly database connection after the job completes
+      closeDatabase(monthlyDb);
+      
+      // Restore console and log the completion message
+      const message = restoreConsole();
+      console.log(message);
     })
     .catch(error => {
       console.error('Error during user processing:', error.message);
+      console.error('=== SCHEDULED JOB FAILED ===');
+      
+      // Close the monthly database connection even on error
+      closeDatabase(monthlyDb);
+      
+      // Restore console even if there's an error
+      const message = restoreConsole();
+      console.log(message);
     });
 });
+
+console.log('Energy Consumption Data Fetcher started');
+console.log('Application will run scheduled job at midnight on the 14th day of every month');
+console.log('Next scheduled run:', job.nextInvocation());
+console.log('Application is running and waiting for scheduled jobs...');
+console.log('Current date:', new Date().toISOString());
