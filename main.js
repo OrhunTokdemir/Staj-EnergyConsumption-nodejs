@@ -4,7 +4,8 @@ const fs = require('fs'); // Add fs module to read files
 const schedule = require('node-schedule');
 require('dotenv').config();
 const setupDatabase = require('./db.js'); // Import the setup function
-const { insertEnergyData, closeDatabase } = require('./dbMethods.js');
+const { createNewDatabaseConnection } = require('./db.js'); // Import the new connection function
+const { insertEnergyData, closeDatabase, deleteRows } = require('./dbMethods.js');
 const { sendEmail } = require('./message');
 const setupLogger = require('./logger'); // Import the logger
 const { setPeriodDate } = require('./time.js');
@@ -130,13 +131,16 @@ function getTotalCount(ticket) {
 // Function to process all pages for a specific user
 function processUserData(ticket, userType, totalCount, pageSize) {
   const totalPages = Math.ceil(totalCount / pageSize);
+  const periodDate = setPeriodDate(); // Track the period date for this run
   
   console.log(`Processing ${userType} - Total records: ${totalCount}, Total pages: ${totalPages}`);
+  console.log(`Period date for this run: ${periodDate}`);
   
   // Process pages sequentially instead of all at once
   let currentPage = 1;
-  let errorCount = 0; // Move errorCount outside so it persists across calls
+  let errorCount = 0;
   const EmailRecipient = process.env.EMAIL_RECIPIENT;
+  
   function processNextPage() {
     if (currentPage <= totalPages) {
       console.log(`Processing ${userType} page ${currentPage}...`);
@@ -158,7 +162,27 @@ function processUserData(ticket, userType, totalCount, pageSize) {
             errorCount++;
             if (errorCount >= 5) {
               console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
-              sendEmail(EmailRecipient, 'API Error Notification', `Too many errors encountered while processing ${userType}. Please check the API status.`);
+              
+              // DELETE ALL ROWS ADDED IN THIS CYCLE
+              try {
+                console.log(`Deleting all rows added for ${userType} in this cycle due to too many errors...`);
+                
+                // Use the same global database connection for deletion
+                const deletedCount = deleteRows(db, userType, periodDate);
+                console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
+                
+                // Send email with deletion info
+                sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
+                  `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
+                  `Data rollback performed: ${deletedCount} rows deleted for period ${periodDate}`);
+                
+              } catch (deleteError) {
+                console.error(`Error during data rollback for ${userType}:`, deleteError.message);
+                sendEmail(EmailRecipient, 'API Error Notification - Rollback Failed', 
+                  `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
+                  `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}`);
+              }
+              
               return Promise.resolve(); // Stop further processing
             }
           } else {
@@ -209,20 +233,68 @@ function authenticateAndProcessUser(username, userType) {
     });
 }
 
-// Set up a cleanup function for when the app is shutting down
+// Set up cleanup functions for when the app is shutting down
 process.on('SIGINT', () => {
-  console.log('Application shutting down, cleaning up...');
-  closeDatabase(db);
+  console.log('Application shutting down (SIGINT), cleaning up...');
+  if (db) {
+    closeDatabase(db);
+  }
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('Application terminated, cleaning up...');
-  closeDatabase(db);
+  console.log('Application terminated (SIGTERM), cleaning up...');
+  if (db) {
+    closeDatabase(db);
+  }
   process.exit(0);
 });
 
-const job = schedule.scheduleJob('0 * 1 16 * *', function(){
+// PM2 specific cleanup - when PM2 stops the process
+process.on('SIGQUIT', () => {
+  console.log('Application quit (SIGQUIT), cleaning up...');
+  if (db) {
+    closeDatabase(db);
+  }
+  process.exit(0);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error.message);
+  console.error('Stack:', error.stack);
+  if (db) {
+    closeDatabase(db);
+  }
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  if (db) {
+    closeDatabase(db);
+  }
+  process.exit(1);
+});
+
+// Handle process exit
+process.on('exit', (code) => {
+  console.log(`Process exiting with code: ${code}`);
+  // Note: Only synchronous operations are safe here
+  // The database should already be closed by other handlers
+});
+
+// Handle PM2 reload/restart
+process.on('SIGUSR2', () => {
+  console.log('Application reloading (SIGUSR2), cleaning up...');
+  if (db) {
+    closeDatabase(db);
+  }
+  process.exit(0);
+});
+
+const job = schedule.scheduleJob('0 * 10 16 * *', function(){
   // This runs at midnight (00:00) on the 14th day of every month
   
   // Set up logger with current date/time for this specific run
@@ -233,10 +305,19 @@ const job = schedule.scheduleJob('0 * 1 16 * *', function(){
   console.log('Job execution time:', jobStartTime.toISOString());
   console.log('Starting data fetching process for both users...');
   
-  // Create a fresh database connection for this monthly run
-  const monthlyDb = setupDatabase();
+  // Create a new database connection for this scheduled cycle
+  let monthlyDb;
+  try {
+    monthlyDb = createNewDatabaseConnection();
+    console.log('New database connection established for monthly job');
+  } catch (error) {
+    console.error('Failed to establish database connection for monthly job:', error.message);
+    const message = restoreConsole();
+    console.log(message);
+    return;
+  }
   
-  // Modified function to use the fresh database connection
+  // Modified function to use the global database connection
   function authenticateAndProcessUserMonthly(username, userType) {
     return authenticate(username, PASSWORD)
       .then(ticket => {
@@ -255,8 +336,10 @@ const job = schedule.scheduleJob('0 * 1 16 * *', function(){
   // Modified function to use the fresh database connection
   function processUserDataMonthly(ticket, userType, totalCount, pageSize, dbConnection) {
     const totalPages = Math.ceil(totalCount / pageSize);
+    const periodDate = setPeriodDate(); // Track the period date for this run
     
     console.log(`Processing ${userType} - Total records: ${totalCount}, Total pages: ${totalPages}`);
+    console.log(`Period date for this monthly run: ${periodDate}`);
     
     // Process pages sequentially instead of all at once
     let currentPage = 1;
@@ -284,7 +367,30 @@ const job = schedule.scheduleJob('0 * 1 16 * *', function(){
               errorCount++;
               if (errorCount >= 5) {
                 console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
-                sendEmail(EmailRecipient, 'API Error Notification', `Too many errors encountered while processing ${userType}. Please check the API status.`);
+                
+                // DELETE ALL ROWS ADDED IN THIS MONTHLY CYCLE
+                try {
+                  console.log(`Deleting all rows added for ${userType} in this monthly cycle due to too many errors...`);
+                  
+                  // Use the same database connection for deletion
+                  const deletedCount = deleteRows(dbConnection, userType, periodDate);
+                  console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
+                  
+                  // Send email with deletion info
+                  sendEmail(EmailRecipient, 'Monthly API Error Notification - Data Rolled Back', 
+                    `Too many errors encountered while processing ${userType} in monthly job. Please check the API status.\n\n` +
+                    `Data rollback performed: ${deletedCount} rows deleted for period ${periodDate}\n` +
+                    `Monthly job execution time: ${new Date().toISOString()}`);
+                  
+                } catch (deleteError) {
+                  console.error(`Error during monthly data rollback for ${userType}:`, deleteError.message);
+                  sendEmail(EmailRecipient, 'Monthly API Error Notification - Rollback Failed', 
+                    `Too many errors encountered while processing ${userType} in monthly job. Please check the API status.\n\n` +
+                    `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}\n` +
+                    `Error: ${deleteError.message}\n` +
+                    `Monthly job execution time: ${new Date().toISOString()}`);
+                }
+                
                 return Promise.resolve();
               }
             } else {
@@ -354,8 +460,14 @@ const job = schedule.scheduleJob('0 * 1 16 * *', function(){
       console.log('All users processed successfully!');
       console.log('=== SCHEDULED JOB COMPLETED ===');
       
-      // Close the monthly database connection after the job completes
-      closeDatabase(monthlyDb);
+      // Close the database connection for this cycle
+      try {
+        console.log('Closing database connection for monthly job cycle...');
+        closeDatabase(monthlyDb);
+        console.log('Database connection closed successfully for monthly job cycle');
+      } catch (closeError) {
+        console.error('Error closing database connection for monthly job:', closeError.message);
+      }
       
       // Restore console and log the completion message
       const message = restoreConsole();
@@ -365,8 +477,14 @@ const job = schedule.scheduleJob('0 * 1 16 * *', function(){
       console.error('Error during user processing:', error.message);
       console.error('=== SCHEDULED JOB FAILED ===');
       
-      // Close the monthly database connection even on error
-      closeDatabase(monthlyDb);
+      // Close the database connection even if there's an error
+      try {
+        console.log('Closing database connection for failed monthly job cycle...');
+        closeDatabase(monthlyDb);
+        console.log('Database connection closed successfully for failed monthly job cycle');
+      } catch (closeError) {
+        console.error('Error closing database connection for failed monthly job:', closeError.message);
+      }
       
       // Restore console even if there's an error
       const message = restoreConsole();

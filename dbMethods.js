@@ -80,26 +80,61 @@ function getValue(obj, key, subKey) {
 
 // Function to close database connection properly
 function closeDatabase(db) {
-  if (db) {
-    // Run WAL checkpoint to commit changes
-    try {
-      db.pragma('wal_checkpoint(FULL)');
-      console.log('WAL checkpoint completed');
-    } catch (err) {
-      console.error('Error during WAL checkpoint:', err.message);
-    }
+  if (!db) {
+    console.log('Database connection is null or undefined');
+    return;
+  }
+  
+  if (!db.open) {
+    console.log('Database connection is already closed');
+    return;
+  }
+  
+  try {
+    // Run WAL checkpoint to commit all changes and force write to main database
+    console.log('Running WAL checkpoint...');
+    db.pragma('wal_checkpoint(FULL)');
+    console.log('WAL checkpoint completed successfully');
     
-    // Close the database
+    // Additional checkpoint to ensure all data is written
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('WAL truncate checkpoint completed');
+    
+  } catch (err) {
+    console.error('Error during WAL checkpoint:', err.message);
+    // Continue with closing even if checkpoint fails
+  }
+  
+  try {
+    // Close the database connection
+    db.close();
+    console.log('Database connection closed successfully');
+  } catch (err) {
+    console.error('Error closing database:', err.message);
+  }
+}
+
+// Function to delete rows for a specific user and period
+function deleteRows(db, kullanici, periodDate) {
+  if (db) {
     try {
-      db.close();
-      console.log('Database connection closed properly');
-    } catch (err) {
-      console.error('Error closing database:', err.message);
+      const deleteStmt = db.prepare(`
+        DELETE FROM K1 
+        WHERE KULLANICI = ? AND PERIODDATE = ?
+      `);
+      
+      const result = deleteStmt.run(kullanici, periodDate);
+      console.log(`Deleted ${result.changes} rows for ${kullanici} with period ${periodDate}`);
+      return result.changes;
+    } catch (error) {
+      console.error(`Error deleting rows for ${kullanici}:`, error.message);
+      throw error;
     }
   }
 }
 
 module.exports = {
     insertEnergyData,
-    closeDatabase
+    closeDatabase,
+    deleteRows
 };
