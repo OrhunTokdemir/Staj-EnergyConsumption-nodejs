@@ -9,7 +9,7 @@ else{
     month++;
 }
 month=(String(month).padStart(2, '0'));
-return `${year}-07-01T00:00:00+03:00`;
+return `${year}-${month}-01T00:00:00+03:00`;
 }
 
 module.exports = { setPeriodDate };
