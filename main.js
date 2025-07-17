@@ -377,14 +377,14 @@ const job = schedule.scheduleJob('0 * 11 16 * *', function(){
                   console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
                   
                   // Send email with deletion info
-                  sendEmail(EmailRecipient, 'Monthly API Error Notification - Data Rolled Back', 
+                  sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
                     `Too many errors encountered while processing ${userType} in monthly job. Please check the API status.\n\n` +
                     `Data rollback performed: ${deletedCount} rows deleted for period ${periodDate}\n` +
                     `Monthly job execution time: ${new Date().toISOString()}`);
                   
                 } catch (deleteError) {
                   console.error(`Error during monthly data rollback for ${userType}:`, deleteError.message);
-                  sendEmail(EmailRecipient, 'Monthly API Error Notification - Rollback Failed', 
+                  sendEmail(EmailRecipient, 'API Error Notification - Rollback Failed', 
                     `Too many errors encountered while processing ${userType} in monthly job. Please check the API status.\n\n` +
                     `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}\n` +
                     `Error: ${deleteError.message}\n` +
