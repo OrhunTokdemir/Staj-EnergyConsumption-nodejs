@@ -493,7 +493,7 @@ const job = schedule.scheduleJob('0 0 0 25 * *', function(){
 });
 
 console.log('Energy Consumption Data Fetcher started');
-console.log('Application will run scheduled job at midnight on the 14th day of every month');
+console.log('Application will run scheduled job at midnight on the 25th day of every month');
 console.log('Next scheduled run:', job.nextInvocation());
 console.log('Application is running and waiting for scheduled jobs...');
 console.log('Current date:', new Date().toISOString());
