@@ -203,19 +203,19 @@ function processUserData(ticket, userType, totalCount, pageSize) {
 
 // Run the authentication process and then fetch energy data
 // Load credentials from the JSON file
-let credentials;
-try {
-  const rawData = fs.readFileSync('./credentials.json');
-  credentials = JSON.parse(rawData);
-  console.log('Credentials loaded successfully');
-} catch (error) {
-  console.error('Failed to load credentials:', error.message);
-  process.exit(1); // Exit if credentials can't be loaded
-}
+//let credentials;
+//try {
+//  const rawData = fs.readFileSync('./credentials.json');
+//  credentials = JSON.parse(rawData);
+//  console.log('Credentials loaded successfully');
+//} catch (error) {
+//  console.error('Failed to load credentials:', error.message);
+//  process.exit(1); // Exit if credentials can't be loaded
+//}
 
-const USERNAMEK1 = credentials.username1;
-const USERNAMEK2 = credentials.username2;
-const PASSWORD = credentials.password;
+const USERNAMEK1 = provess.env.USERNAME1; // Use environment variables for credentials
+const USERNAMEK2 = process.env.USERNAME2;
+const PASSWORD = process.env.USERPASSWORD;
 
 // Function to authenticate and process data for a specific user
 function authenticateAndProcessUser(username, userType) {
