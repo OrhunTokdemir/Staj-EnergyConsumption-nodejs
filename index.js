@@ -6,8 +6,8 @@ require('dotenv').config();
 const setupDatabase = require('./db.js'); // Import the setup function
 const { createNewDatabaseConnection } = require('./db.js'); // Import the new connection function
 const { insertEnergyData, closeDatabase, deleteRows } = require('./dbMethods.js');
-const { sendEmail } = require('./message');
-const setupLogger = require('./logger'); // Import the logger
+const { sendEmail } = require('./message.js');
+const setupLogger = require('./logger.js'); // Import the logger
 const { setPeriodDate } = require('./time.js');
 
 // Store original console for potential restoration
