@@ -213,7 +213,7 @@ function processUserData(ticket, userType, totalCount, pageSize) {
 //  process.exit(1); // Exit if credentials can't be loaded
 //}
 
-const USERNAMEK1 = provess.env.USERNAME1; // Use environment variables for credentials
+const USERNAMEK1 = process.env.USERNAME1; // ✅ Fixed: "process" not "provess"
 const USERNAMEK2 = process.env.USERNAME2;
 const PASSWORD = process.env.USERPASSWORD;
 
