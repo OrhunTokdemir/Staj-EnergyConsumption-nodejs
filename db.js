@@ -3,7 +3,7 @@ const Database = require('better-sqlite3');
 
 let db;
 
-function setupDatabase(dbPath = 'Energydata.db') {
+function setupDatabase(dbPath = './data/Energydata.db') {
     // If the database connection is already open, return it.
     if (db) {
         return db;
@@ -74,7 +74,7 @@ function setupDatabase(dbPath = 'Energydata.db') {
 }
 
 // Function to create a new database connection (for scheduled jobs)
-function createNewDatabaseConnection(dbPath = 'Energydata.db') {
+function createNewDatabaseConnection(dbPath = './data/Energydata.db') {
     // Always create a new connection
     const newDb = new Database(dbPath);
 
