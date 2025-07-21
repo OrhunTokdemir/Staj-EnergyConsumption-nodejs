@@ -9,6 +9,9 @@
 ARG NODE_VERSION=22.16.0
 
 FROM node:${NODE_VERSION}-alpine
+#Author information
+LABEL maintainer="OrhunTokdemir"
+LABEL org.opencontainers.image.source="https://github.com/OrhunTokdemir/Staj-EnergyConsumption-nodejs"
 
 # Use production node environment by default.
 ENV NODE_ENV=production
