@@ -3,7 +3,7 @@ function insertEnergyData(db, items, kullanici) {
         try {
             // Changed to INSERT OR IGNORE to skip duplicates
             const insert = db.prepare(`
-                INSERT OR IGNORE INTO K1 (
+                INSERT OR IGNORE INTO USER (
                     ADDRESS, ANNUALAVERAGECONSUMPTION, BILATERALCONSUMERGROUP, CITYID, CITYNAME,
                     CONNECTIONPOSITION, CONSUMPTINPOINTEIC, CONSUMPTIONPOINTID, CONTRACTPOWER,
                     CUSTOMERNO, DEMANDDIRECTION, DEMANDID, DEMANDSTATUS, DEMANDTYPE, DESCRIPTION,
@@ -119,7 +119,7 @@ function deleteRows(db, kullanici, periodDate) {
   if (db) {
     try {
       const deleteStmt = db.prepare(`
-        DELETE FROM K1 
+        DELETE FROM USER 
         WHERE KULLANICI = ? AND PERIODDATE = ?
       `);
       

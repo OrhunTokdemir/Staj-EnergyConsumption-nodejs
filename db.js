@@ -16,7 +16,7 @@ function setupDatabase(dbPath = './data/Energydata.db') {
     console.log('Database connection established.');
 
     // Run the initial schema setup.
-    db.exec(`CREATE TABLE IF NOT EXISTS K1(
+    db.exec(`CREATE TABLE IF NOT EXISTS USER(
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         ADDRESS TEXT,
         ANNUALAVERAGECONSUMPTION REAL,
@@ -81,7 +81,7 @@ function createNewDatabaseConnection(dbPath = './data/Energydata.db') {
     console.log('New database connection established for scheduled job.');
 
     // Run the initial schema setup.
-    newDb.exec(`CREATE TABLE IF NOT EXISTS K1(
+    newDb.exec(`CREATE TABLE IF NOT EXISTS USER(
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         ADDRESS TEXT,
         ANNUALAVERAGECONSUMPTION REAL,
