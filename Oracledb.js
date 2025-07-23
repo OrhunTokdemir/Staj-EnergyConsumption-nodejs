@@ -1,5 +1,5 @@
 const oracledb = require('oracledb');
-
+require('dotenv').config();
 let connection;
 
 async function setupOracleDatabase(){
@@ -68,7 +68,7 @@ async function connectOracle() {
   try {
     const connection = await oracledb.getConnection({
       user: 'SYSTEM', // replace with your Oracle username
-      password: 'hello', // replace with your Oracle password
+      password: process.env.DATABASEPASSWORD, // replace with your Oracle password
       connectString: 'localhost:1521/XEPDB1' // replace XEPDB1 if your DB service name is different
     });
 

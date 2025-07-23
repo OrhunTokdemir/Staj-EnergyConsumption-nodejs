@@ -3,9 +3,8 @@ const qs = require('qs');
 const fs = require('fs'); // Add fs module to read files
 const schedule = require('node-schedule');
 require('dotenv').config();
-const setupDatabase = require('./db.js'); // Import the setup function
-const { createNewDatabaseConnection } = require('./db.js'); // Import the new connection function
-const { insertEnergyData, closeDatabase, deleteRows } = require('./dbMethods.js');
+const { setupOracleDatabase } = require('./Oracledb');
+const { insertEnergyDataOracle, closeDatabaseOracle, deleteRowsOracle } = require('./OracledbMethods');
 const { sendEmail } = require('./message.js');
 const setupLogger = require('./logger.js'); // Import the logger
 const { setPeriodDate } = require('./time.js');
@@ -13,8 +12,10 @@ const { setPeriodDate } = require('./time.js');
 // Store original console for potential restoration
 let originalConsole = console;
 
-// 1. Call the function to get the single DB instance
-const db = setupDatabase();
+
+// 1. Call the function to get the single OracleDB instance
+let db;
+setupOracleDatabase().then(conn => { db = conn; });
 
 
 
@@ -78,7 +79,7 @@ function fetchEnergyData(ticket,userType, pageNumber = 1, pageSize = 10) {
       const items = response.data.body.content.items;
 
       // Wait for the database insertion to complete
-      return insertEnergyData(db, items, userType)
+      return insertEnergyDataOracle(items, userType)
         .then(() => {
           console.log(`Data insertion process completed for ${userType}.`);
           return items;
@@ -167,9 +168,20 @@ function processUserData(ticket, userType, totalCount, pageSize) {
               try {
                 console.log(`Deleting all rows added for ${userType} in this cycle due to too many errors...`);
                 
-                // Use the same global database connection for deletion
-                const deletedCount = deleteRows(db, userType, periodDate);
-                console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
+                // Use the OracleDB method for deletion
+                deleteRowsOracle(userType, periodDate).then(deletedCount => {
+                  console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
+                  // Send email with deletion info
+                  sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
+                    `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
+                    `Data rollback performed: ${deletedCount} rows deleted for period ${periodDate}`);
+                }).catch(deleteError => {
+                  console.error(`Error during data rollback for ${userType}:`, deleteError.message);
+                  sendEmail(EmailRecipient, 'API Error Notification - Rollback Failed', 
+                    `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
+                    `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}`);
+                });
+                return Promise.resolve(); // Stop further processing
                 
                 // Send email with deletion info
                 sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
@@ -234,46 +246,51 @@ function authenticateAndProcessUser(username, userType) {
 }
 
 // Set up cleanup functions for when the app is shutting down
+
 process.on('SIGINT', () => {
   console.log('Application shutting down (SIGINT), cleaning up...');
   if (db) {
-    closeDatabase(db);
+    closeDatabaseOracle(db);
   }
   process.exit(0);
 });
 
+
 process.on('SIGTERM', () => {
   console.log('Application terminated (SIGTERM), cleaning up...');
   if (db) {
-    closeDatabase(db);
+    closeDatabaseOracle(db);
   }
   process.exit(0);
 });
 
 // PM2 specific cleanup - when PM2 stops the process
+
 process.on('SIGQUIT', () => {
   console.log('Application quit (SIGQUIT), cleaning up...');
   if (db) {
-    closeDatabase(db);
+    closeDatabaseOracle(db);
   }
   process.exit(0);
 });
 
 // Handle uncaught exceptions
+
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error.message);
   console.error('Stack:', error.stack);
   if (db) {
-    closeDatabase(db);
+    closeDatabaseOracle(db);
   }
   process.exit(1);
 });
 
 // Handle unhandled promise rejections
+
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   if (db) {
-    closeDatabase(db);
+    closeDatabaseOracle(db);
   }
   process.exit(1);
 });
@@ -286,10 +303,11 @@ process.on('exit', (code) => {
 });
 
 // Handle PM2 reload/restart
+
 process.on('SIGUSR2', () => {
   console.log('Application reloading (SIGUSR2), cleaning up...');
   if (db) {
-    closeDatabase(db);
+    closeDatabaseOracle(db);
   }
   process.exit(0);
 });
@@ -306,16 +324,11 @@ const job = schedule.scheduleJob('0 0 0 25 * *', function(){
   console.log('Starting data fetching process for both users...');
   
   // Create a new database connection for this scheduled cycle
+  // For OracleDB, reuse the same connection (no need for createNewDatabaseConnection)
   let monthlyDb;
-  try {
-    monthlyDb = createNewDatabaseConnection();
-    console.log('New database connection established for monthly job');
-  } catch (error) {
-    console.error('Failed to establish database connection for monthly job:', error.message);
-    const message = restoreConsole();
-    console.log(message);
-    return;
-  }
+  setupOracleDatabase().then(conn => {
+    monthlyDb = conn;
+    console.log('OracleDB connection established for monthly job');
   
   // Modified function to use the global database connection
   function authenticateAndProcessUserMonthly(username, userType) {
@@ -369,28 +382,21 @@ const job = schedule.scheduleJob('0 0 0 25 * *', function(){
                 console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
                 
                 // DELETE ALL ROWS ADDED IN THIS MONTHLY CYCLE
-                try {
-                  console.log(`Deleting all rows added for ${userType} in this monthly cycle due to too many errors...`);
-                  
-                  // Use the same database connection for deletion
-                  const deletedCount = deleteRows(dbConnection, userType, periodDate);
+                deleteRowsOracle(userType, periodDate).then(deletedCount => {
                   console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
-                  
                   // Send email with deletion info
                   sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
                     `Too many errors encountered while processing ${userType} in monthly job. Please check the API status.\n\n` +
                     `Data rollback performed: ${deletedCount} rows deleted for period ${periodDate}\n` +
                     `Monthly job execution time: ${new Date().toISOString()}`);
-                  
-                } catch (deleteError) {
+                }).catch(deleteError => {
                   console.error(`Error during monthly data rollback for ${userType}:`, deleteError.message);
                   sendEmail(EmailRecipient, 'API Error Notification - Rollback Failed', 
                     `Too many errors encountered while processing ${userType} in monthly job. Please check the API status.\n\n` +
                     `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}\n` +
                     `Error: ${deleteError.message}\n` +
                     `Monthly job execution time: ${new Date().toISOString()}`);
-                }
-                
+                });
                 return Promise.resolve();
               }
             } else {
@@ -438,8 +444,8 @@ const job = schedule.scheduleJob('0 0 0 25 * *', function(){
       .then((response) => {
         const items = response.data.body.content.items;
 
-        // Wait for the database insertion to complete using the fresh connection
-        return insertEnergyData(dbConnection, items, userType)
+        // Wait for the OracleDB insertion to complete
+        return insertEnergyDataOracle(items, userType)
           .then(() => {
             console.log(`Data insertion process completed for ${userType}.`);
             return items;
@@ -459,16 +465,14 @@ const job = schedule.scheduleJob('0 0 0 25 * *', function(){
     .then(() => {
       console.log('All users processed successfully!');
       console.log('=== SCHEDULED JOB COMPLETED ===');
-      
-      // Close the database connection for this cycle
+      // Close the OracleDB connection for this cycle
       try {
-        console.log('Closing database connection for monthly job cycle...');
-        closeDatabase(monthlyDb);
-        console.log('Database connection closed successfully for monthly job cycle');
+        console.log('Closing OracleDB connection for monthly job cycle...');
+        closeDatabaseOracle(monthlyDb);
+        console.log('OracleDB connection closed successfully for monthly job cycle');
       } catch (closeError) {
-        console.error('Error closing database connection for monthly job:', closeError.message);
+        console.error('Error closing OracleDB connection for monthly job:', closeError.message);
       }
-      
       // Restore console and log the completion message
       const message = restoreConsole();
       console.log(message);
@@ -476,20 +480,19 @@ const job = schedule.scheduleJob('0 0 0 25 * *', function(){
     .catch(error => {
       console.error('Error during user processing:', error.message);
       console.error('=== SCHEDULED JOB FAILED ===');
-      
-      // Close the database connection even if there's an error
+      // Close the OracleDB connection even if there's an error
       try {
-        console.log('Closing database connection for failed monthly job cycle...');
-        closeDatabase(monthlyDb);
-        console.log('Database connection closed successfully for failed monthly job cycle');
+        console.log('Closing OracleDB connection for failed monthly job cycle...');
+        closeDatabaseOracle(monthlyDb);
+        console.log('OracleDB connection closed successfully for failed monthly job cycle');
       } catch (closeError) {
-        console.error('Error closing database connection for failed monthly job:', closeError.message);
+        console.error('Error closing OracleDB connection for failed monthly job:', closeError.message);
       }
-      
       // Restore console even if there's an error
       const message = restoreConsole();
       console.log(message);
     });
+  });
 });
 
 console.log('Energy Consumption Data Fetcher started');

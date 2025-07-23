@@ -80,16 +80,19 @@ async function insertEnergyDataOracle(items, kullanici) {
 }
 
 // Function to close OracleDB connection
-async function closeDatabaseOracle() {
-    if (typeof connection !== 'undefined' && connection) {
+async function closeDatabaseOracle(connection) {
+    if (connection) {
         try {
             await connection.close();
             console.log('OracleDB connection closed successfully');
+            return true;
         } catch (err) {
             console.error('Error closing OracleDB connection:', err.message);
+            return false;
         }
     } else {
         console.log('OracleDB connection is null or undefined');
+        return false;
     }
 }
 
