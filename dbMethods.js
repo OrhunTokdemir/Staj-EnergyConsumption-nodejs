@@ -136,5 +136,6 @@ function deleteRows(db, kullanici, periodDate) {
 module.exports = {
     insertEnergyData,
     closeDatabase,
-    deleteRows
+    deleteRows,
+    getValue
 };

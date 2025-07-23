@@ -1,5 +1,7 @@
 const oracledb = require('oracledb');
+
 let connection;
+
 async function setupOracleDatabase(){
     if (connection) {
         return connection;
@@ -56,8 +58,8 @@ async function setupOracleDatabase(){
             console.error('Error setting up Oracle Database:', err);
         }
     }
-    const result = await connection.execute(`SELECT table_name FROM user_tables`);
-    console.log('Tables:', result.rows);
+    //const result = await connection.execute(`SELECT table_name FROM user_tables`);
+    //console.log('Tables:', result.rows);
     return connection;
 }
 
@@ -76,4 +78,7 @@ async function connectOracle() {
     console.error('OracleDB connection error:', err);
   }
 }
-setupOracleDatabase();
+module.exports = {
+  setupOracleDatabase,
+  connectOracle
+};
