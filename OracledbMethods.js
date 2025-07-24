@@ -67,13 +67,12 @@ async function insertEnergyDataOracle(items, kullanici) {
             KULLANICI: kullanici
         };
         try {
-            await connection.execute(mergeSql, bindParams, { autoCommit: true });
-        } catch (err) {
-            if (err.errorNum === 1) { // ORA-00001: unique constraint violated
+            const result = await connection.execute(mergeSql, bindParams, { autoCommit: true });
+            if (result.rowsAffected === 0) {
                 console.log(`Skipped duplicate record: ${item.uniqueCode} - ${item.periodDate}`);
-            } else {
-                console.error(`Error inserting record ${item.uniqueCode}: ${err.message}`);
             }
+        } catch (err) {
+            console.error(`Error inserting record ${item.uniqueCode}: ${err.message}`);
         }
     }
     console.log(`Data insertion process completed for ${kullanici}`);

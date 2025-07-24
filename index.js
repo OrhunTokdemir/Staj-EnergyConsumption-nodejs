@@ -312,7 +312,7 @@ process.on('SIGUSR2', () => {
   process.exit(0);
 });
 
-const job = schedule.scheduleJob('0 0 0 25 * *', function(){
+const job = schedule.scheduleJob('0 * * * * *', function(){
   // This runs at midnight (00:00) on the 25th day of every month
   
   // Set up logger with current date/time for this specific run
