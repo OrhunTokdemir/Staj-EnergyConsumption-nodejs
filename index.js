@@ -1,3 +1,16 @@
+// Handle PM2 and manual shutdown signals to close OracleDB connection
+function handleShutdown() {
+  if (typeof monthlyDb !== 'undefined' && monthlyDb) {
+    closeDatabaseOracle(monthlyDb);
+    console.log('OracleDB connection closed due to manual shutdown');
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', handleShutdown);
+process.on('SIGTERM', handleShutdown);
+process.on('SIGQUIT', handleShutdown);
+process.on('SIGUSR2', handleShutdown);
 const axios = require('axios');
 const qs = require('qs');
 const fs = require('fs'); // Add fs module to read files
@@ -245,7 +258,7 @@ function authenticateAndProcessUser(username, userType) {
 
 // ...existing code...
 
-const job = schedule.scheduleJob('0 * * * * *', function(){
+const job = schedule.scheduleJob('0 0 0 25 * *', function(){
   // This runs at midnight (00:00) on the 25th day of every month
   
   // Set up logger with current date/time for this specific run
