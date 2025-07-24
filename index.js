@@ -1,3 +1,14 @@
+const axios = require('axios');
+const qs = require('qs');
+const fs = require('fs'); // Add fs module to read files
+const schedule = require('node-schedule');
+require('dotenv').config();
+const { setupOracleDatabase } = require('./Oracledb');
+const { insertEnergyDataOracle, closeDatabaseOracle, deleteRowsOracle } = require('./OracledbMethods');
+const { sendEmail } = require('./message.js');
+const setupLogger = require('./logger.js'); // Import the logger
+const { setPeriodDate } = require('./time.js');
+
 // Handle PM2 and manual shutdown signals to close OracleDB connection
 function handleShutdown() {
   if (typeof monthlyDb !== 'undefined' && monthlyDb) {
@@ -11,17 +22,6 @@ process.on('SIGINT', handleShutdown);
 process.on('SIGTERM', handleShutdown);
 process.on('SIGQUIT', handleShutdown);
 process.on('SIGUSR2', handleShutdown);
-const axios = require('axios');
-const qs = require('qs');
-const fs = require('fs'); // Add fs module to read files
-const schedule = require('node-schedule');
-require('dotenv').config();
-const { setupOracleDatabase } = require('./Oracledb');
-const { insertEnergyDataOracle, closeDatabaseOracle, deleteRowsOracle } = require('./OracledbMethods');
-const { sendEmail } = require('./message.js');
-const setupLogger = require('./logger.js'); // Import the logger
-const { setPeriodDate } = require('./time.js');
-
 
 // Store original console for potential restoration
 let originalConsole = console;
