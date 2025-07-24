@@ -64,7 +64,7 @@ async function setupOracleDatabase(){
 async function connectOracle() {
   try {
     const connection = await oracledb.getConnection({
-      user: 'SYSTEM', // replace with your Oracle username
+      user: process.env.DATABASE_USER, // replace with your Oracle username
       password: process.env.DATABASEPASSWORD, // replace with your Oracle password
       connectString: 'localhost:1521/XEPDB1' // replace XEPDB1 if your DB service name is different
     });

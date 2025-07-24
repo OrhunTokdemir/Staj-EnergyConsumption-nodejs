@@ -9,13 +9,22 @@ const { sendEmail } = require('./message.js');
 const setupLogger = require('./logger.js'); // Import the logger
 const { setPeriodDate } = require('./time.js');
 
+// Track the latest OracleDB connection for shutdown
+let lastMonthlyDb = null;
+function setLastMonthlyDb(db) {
+  lastMonthlyDb = db;
+}
+// Store original console for potential restoration
+let originalConsole = console;
 // Handle PM2 and manual shutdown signals to close OracleDB connection
 function handleShutdown() {
-  if (typeof monthlyDb !== 'undefined' && monthlyDb) {
-    closeDatabaseOracle(monthlyDb);
-    console.log('OracleDB connection closed due to manual shutdown');
+  if (lastMonthlyDb) {
+    closeDatabaseOracle(lastMonthlyDb);
+    originalConsole.log('OracleDB connection closed due to manual shutdown');
+  } else {
+    originalConsole.log('No OracleDB connection to close during shutdown');
   }
-  process.exit(0);
+  setTimeout(() => process.exit(0), 1000);
 }
 
 process.on('SIGINT', handleShutdown);
@@ -24,7 +33,7 @@ process.on('SIGQUIT', handleShutdown);
 process.on('SIGUSR2', handleShutdown);
 
 // Store original console for potential restoration
-let originalConsole = console;
+
 
 
 
@@ -258,7 +267,7 @@ function authenticateAndProcessUser(username, userType) {
 
 // ...existing code...
 
-const job = schedule.scheduleJob('0 0 0 25 * *', function(){
+const job = schedule.scheduleJob('0 * * * * *', function(){
   // This runs at midnight (00:00) on the 25th day of every month
   
   // Set up logger with current date/time for this specific run
@@ -274,6 +283,7 @@ const job = schedule.scheduleJob('0 0 0 25 * *', function(){
   let monthlyDb;
   setupOracleDatabase().then(conn => {
     monthlyDb = conn;
+    setLastMonthlyDb(conn); // Make it accessible for shutdown
     console.log('OracleDB connection established for monthly job');
   
   // Modified function to use the global database connection

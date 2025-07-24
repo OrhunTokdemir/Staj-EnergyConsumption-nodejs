@@ -143,7 +143,7 @@ dist
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
-!.yarn/sdks
+!.yarn/
 !.yarn/versions
 
 # Vite logs files

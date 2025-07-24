@@ -31,5 +31,4 @@
 **/values.dev.yaml
 **/build
 **/dist
-LICENSE
-README.md
+*.logs

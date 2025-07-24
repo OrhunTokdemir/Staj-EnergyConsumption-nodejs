@@ -19,6 +19,7 @@ services:
       USERNAME2: ${USERNAME2}
       USERPASSWORD: ${USERPASSWORD}
       EMAIL_RECIPIENT: ${EMAIL_RECIPIENT}
+      DATABASE_USER: ${DATABASE_USER} # Oracle database username
       DATABASEPASSWORD: ${DATABASEPASSWORD}
     ports:
       - 3000:3000
@@ -52,8 +53,7 @@ services:
 #       interval: 10s
 #       timeout: 5s
 #       retries: 5
-volumes:
-  db-data:
+
 # secrets:
 #   db-password:
 #     file: db/password.txt
