@@ -9,13 +9,9 @@ const { sendEmail } = require('./message.js');
 const setupLogger = require('./logger.js'); // Import the logger
 const { setPeriodDate } = require('./time.js');
 
+
 // Store original console for potential restoration
 let originalConsole = console;
-
-
-// 1. Call the function to get the single OracleDB instance
-let db;
-setupOracleDatabase().then(conn => { db = conn; });
 
 
 
@@ -247,70 +243,7 @@ function authenticateAndProcessUser(username, userType) {
 
 // Set up cleanup functions for when the app is shutting down
 
-process.on('SIGINT', () => {
-  console.log('Application shutting down (SIGINT), cleaning up...');
-  if (db) {
-    closeDatabaseOracle(db);
-  }
-  process.exit(0);
-});
-
-
-process.on('SIGTERM', () => {
-  console.log('Application terminated (SIGTERM), cleaning up...');
-  if (db) {
-    closeDatabaseOracle(db);
-  }
-  process.exit(0);
-});
-
-// PM2 specific cleanup - when PM2 stops the process
-
-process.on('SIGQUIT', () => {
-  console.log('Application quit (SIGQUIT), cleaning up...');
-  if (db) {
-    closeDatabaseOracle(db);
-  }
-  process.exit(0);
-});
-
-// Handle uncaught exceptions
-
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error.message);
-  console.error('Stack:', error.stack);
-  if (db) {
-    closeDatabaseOracle(db);
-  }
-  process.exit(1);
-});
-
-// Handle unhandled promise rejections
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  if (db) {
-    closeDatabaseOracle(db);
-  }
-  process.exit(1);
-});
-
-// Handle process exit
-process.on('exit', (code) => {
-  console.log(`Process exiting with code: ${code}`);
-  // Note: Only synchronous operations are safe here
-  // The database should already be closed by other handlers
-});
-
-// Handle PM2 reload/restart
-
-process.on('SIGUSR2', () => {
-  console.log('Application reloading (SIGUSR2), cleaning up...');
-  if (db) {
-    closeDatabaseOracle(db);
-  }
-  process.exit(0);
-});
+// ...existing code...
 
 const job = schedule.scheduleJob('0 * * * * *', function(){
   // This runs at midnight (00:00) on the 25th day of every month
@@ -382,7 +315,7 @@ const job = schedule.scheduleJob('0 * * * * *', function(){
                 console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
                 
                 // DELETE ALL ROWS ADDED IN THIS MONTHLY CYCLE
-                deleteRowsOracle(userType, periodDate).then(deletedCount => {
+                deleteRowsOracle(dbConnection, userType, periodDate).then(deletedCount => {
                   console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
                   // Send email with deletion info
                   sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
@@ -445,7 +378,7 @@ const job = schedule.scheduleJob('0 * * * * *', function(){
         const items = response.data.body.content.items;
 
         // Wait for the OracleDB insertion to complete
-        return insertEnergyDataOracle(items, userType)
+        return insertEnergyDataOracle(dbConnection, items, userType)
           .then(() => {
             console.log(`Data insertion process completed for ${userType}.`);
             return items;

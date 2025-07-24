@@ -1,10 +1,10 @@
 
 const { getValue } = require('./dbMethods');
 const { setupOracleDatabase } = require('./Oracledb');
-
+const { connectOracle } = require('./Oracledb');
 // Insert energy data into OracleDB using MERGE to avoid duplicates
-async function insertEnergyDataOracle(items, kullanici) {
-    const connection = await setupOracleDatabase();
+async function insertEnergyDataOracle(connection ,items, kullanici) {
+    
     const mergeSql = `
         MERGE INTO ENERGY_CONSUMPTION ec
         USING (SELECT :UNIQUECODE AS UNIQUECODE, :PERIODDATE AS PERIODDATE, :KULLANICI AS KULLANICI FROM dual) src
@@ -96,8 +96,8 @@ async function closeDatabaseOracle(connection) {
 }
 
 // Function to delete rows for a specific user and period in OracleDB
-async function deleteRowsOracle(kullanici, periodDate) {
-    const connection = await setupOracleDatabase();
+async function deleteRowsOracle(connection,kullanici, periodDate) {
+   
     try {
         const result = await connection.execute(
             `DELETE FROM ENERGY_CONSUMPTION WHERE KULLANICI = :kullanici AND PERIODDATE = :periodDate`,
