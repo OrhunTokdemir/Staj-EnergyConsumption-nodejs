@@ -1,12 +1,9 @@
+
 const oracledb = require('oracledb');
 require('dotenv').config();
-let connection;
 
 async function setupOracleDatabase(){
-    if (connection) {
-        return connection;
-    }
-    connection = await connectOracle();
+    const connection = await connectOracle();
     try {
         await connection.execute(`
           CREATE TABLE ENERGY_CONSUMPTION (
