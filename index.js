@@ -67,47 +67,48 @@ function authenticate(username, password) {
 }
 
 // Function to fetch data from the API and insert it into the database
-function fetchEnergyData(ticket,userType, pageNumber = 1, pageSize = 10) {
-  let data = JSON.stringify({
-    "periodDate": setPeriodDate(), // Use dynamic date
-    "page": {
-      "number": pageNumber,
-      "size": pageSize,
-      "sort": {
-        "direction": "DESC",
-        "field": "periodDate"
-      }
-    }
-  });
-
-  let config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: 'https://epys.epias.com.tr/demand/v1/pre-notification/supplier/query',
-    headers: { 
-      'TGT': ticket,
-      'Content-Type': 'application/json', 
-      
-    },
-    data: data
-  };
-
-  return axios.request(config)
-    .then((response) => {
-      const items = response.data.body.content.items;
-
-      // Wait for the database insertion to complete
-      return insertEnergyDataOracle(items, userType)
-        .then(() => {
-          console.log(`Data insertion process completed for ${userType}.`);
-          return items;
-        });
-    })
-    .catch((error) => {
-      console.error(`Error fetching energy data for ${userType}:`, error.message);
-      throw error;
-    });
-}
+//function fetchEnergyData(ticket,userType, pageNumber = 1, pageSize = 10) {
+//  let data = JSON.stringify({
+//    "periodDate": setPeriodDate(), // Use dynamic date
+//    "page": {
+//      "number": pageNumber,
+//      "size": pageSize,
+//      "sort": {
+//        "direction": "DESC",
+//        "field": "periodDate"
+//      }
+//    }
+//  });
+//
+//  let config = {
+//    method: 'post',
+//    maxBodyLength: Infinity,
+//    url: 'https://epys.epias.com.tr/demand/v1/pre-notification/supplier/query',
+//    headers: { 
+//      'TGT': ticket,
+//      'Content-Type': 'application/json', 
+//      
+//    },
+//    data: data
+//  };
+//
+//  return axios.request(config)
+//    .then((response) => {
+//      const items = response.data.body.content.items;
+//
+//      // Wait for the database insertion to complete
+//      return insertEnergyDataOracle(items, userType)
+//        .then(() => {
+//          console.log(`Data insertion process completed for ${userType}.`);
+//          return items;
+//        });
+//    })
+//    .catch((error) => {
+//      console.error(`Error fetching energy data for ${userType}:`, error.message);
+//      throw error;
+//    });
+//}
+//
 
 // Function to get the total count of records
 function getTotalCount(ticket) {
@@ -147,100 +148,83 @@ function getTotalCount(ticket) {
     });
 }
 
-// Function to process all pages for a specific user
-function processUserData(ticket, userType, totalCount, pageSize) {
-  const totalPages = Math.ceil(totalCount / pageSize);
-  const periodDate = setPeriodDate(); // Track the period date for this run
-  
-  console.log(`Processing ${userType} - Total records: ${totalCount}, Total pages: ${totalPages}`);
-  console.log(`Period date for this run: ${periodDate}`);
-  
-  // Process pages sequentially instead of all at once
-  let currentPage = 1;
-  let errorCount = 0;
-  const EmailRecipient = process.env.EMAIL_RECIPIENT;
-  
-  function processNextPage() {
-    if (currentPage <= totalPages) {
-      console.log(`Processing ${userType} page ${currentPage}...`);
-      return fetchEnergyData(ticket, userType, currentPage, pageSize)
-        .then(items => {
-          console.log(`${userType} page ${currentPage} processed with ${items.length} records`);
-          currentPage++;
-          return processNextPage(); // Process next page
-        })
-        .catch(error => {
-          console.error(`Error processing ${userType} page ${currentPage}:`, error.message);
-          
-          // Don't count database duplicate/unique constraint errors as real errors
-          const isDuplicateError = error.message.includes('UNIQUE constraint') || 
-                                 error.message.includes('duplicate') ||
-                                 error.message.includes('already exists');
-          
-          if (!isDuplicateError) {
-            errorCount++;
-            if (errorCount >= 5) {
-              console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
-              
-              // DELETE ALL ROWS ADDED IN THIS CYCLE
-              try {
-                console.log(`Deleting all rows added for ${userType} in this cycle due to too many errors...`);
-                
-                // Use the OracleDB method for deletion
-                deleteRowsOracle(userType, periodDate).then(deletedCount => {
-                  console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
-                  // Send email with deletion info
-                  sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
-                    `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
-                    `Data rollback performed: ${deletedCount} rows deleted for period ${periodDate}`);
-                }).catch(deleteError => {
-                  console.error(`Error during data rollback for ${userType}:`, deleteError.message);
-                  sendEmail(EmailRecipient, 'API Error Notification - Rollback Failed', 
-                    `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
-                    `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}`);
-                });
-                return Promise.resolve(); // Stop further processing
-                
-                // Send email with deletion info
-                sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
-                  `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
-                  `Data rollback performed: ${deletedCount} rows deleted for period ${periodDate}`);
-                
-              } catch (deleteError) {
-                console.error(`Error during data rollback for ${userType}:`, deleteError.message);
-                sendEmail(EmailRecipient, 'API Error Notification - Rollback Failed', 
-                  `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
-                  `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}`);
-              }
-              
-              return Promise.resolve(); // Stop further processing
-            }
-          } else {
-            console.log(`Skipping duplicate record error for ${userType} page ${currentPage}, continuing...`);
-          }
-          
-          currentPage++; // Skip to next page even if this one fails
-          return processNextPage(); // Continue with next page even if this one fails
-        });
-    } else {
-      console.log(`All pages processed successfully for ${userType}!`);
-      return Promise.resolve();
-    }
-  }
-  
-  return processNextPage();
-}
-
-// Run the authentication process and then fetch energy data
-// Load credentials from the JSON file
-//let credentials;
-//try {
-//  const rawData = fs.readFileSync('./credentials.json');
-//  credentials = JSON.parse(rawData);
-//  console.log('Credentials loaded successfully');
-//} catch (error) {
-//  console.error('Failed to load credentials:', error.message);
-//  process.exit(1); // Exit if credentials can't be loaded
+//// Function to process all pages for a specific user
+//function processUserData(ticket, userType, totalCount, pageSize) {
+//  const totalPages = Math.ceil(totalCount / pageSize);
+//  const periodDate = setPeriodDate(); // Track the period date for this run
+//  
+//  console.log(`Processing ${userType} - Total records: ${totalCount}, Total pages: ${totalPages}`);
+//  console.log(`Period date for this run: ${periodDate}`);
+//  
+//  // Process pages sequentially instead of all at once
+//  let currentPage = 1;
+//  let errorCount = 0;
+//  const EmailRecipient = process.env.EMAIL_RECIPIENT;
+//  
+//  function processNextPage() {
+//    if (currentPage <= totalPages) {
+//      console.log(`Processing ${userType} page ${currentPage}...`);
+//      return fetchEnergyData(ticket, userType, currentPage, pageSize)
+//        .then(items => {
+//          console.log(`${userType} page ${currentPage} processed with ${items.length} records`);
+//          currentPage++;
+//          return processNextPage(); // Process next page
+//        })
+//        .catch(error => {
+//          console.error(`Error processing ${userType} page ${currentPage}:`, error.message);
+//          
+//          // Don't count database duplicate/unique constraint errors as real errors
+//          const isDuplicateError = error.message.includes('UNIQUE constraint') || 
+//                                 error.message.includes('duplicate') ||
+//                                 error.message.includes('already exists');
+//          
+//          if (!isDuplicateError) {
+//            errorCount++;
+//            if (errorCount >= 5) {
+//              console.error(`Too many errors encountered for ${userType}, stopping further processing and sending email to api owner.`);
+//              
+//              // DELETE ALL ROWS ADDED IN THIS CYCLE
+//              try {
+//                console.log(`Deleting all rows added for ${userType} in this cycle due to too many errors...`);
+//                
+//                // Use the OracleDB method for deletion
+//                deleteRowsOracle(userType, periodDate).then(deletedCount => {
+//                  console.log(`Successfully deleted ${deletedCount} rows for ${userType}`);
+//                  // Send email with deletion info
+//                  sendEmail(EmailRecipient, 'API Error Notification - Data Rolled Back', 
+//                    `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
+//                    `Data rollback performed: ${deletedCount} rows deleted for period ${periodDate}`);
+//                }).catch(deleteError => {
+//                  console.error(`Error during data rollback for ${userType}:`, deleteError.message);
+//                  sendEmail(EmailRecipient, 'API Error Notification - Rollback Failed', 
+//                    `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
+//                    `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}`);
+//                });
+//                return Promise.resolve(); // Stop further processing
+//                
+//              } catch (deleteError) {
+//                console.error(`Error during data rollback for ${userType}:`, deleteError.message);
+//                sendEmail(EmailRecipient, 'API Error Notification - Rollback Failed', 
+//                  `Too many errors encountered while processing ${userType}. Please check the API status.\n\n` +
+//                  `WARNING: Data rollback failed! Manual cleanup may be required for period ${periodDate}`);
+//              }
+//              
+//              return Promise.resolve(); // Stop further processing
+//            }
+//          } else {
+//            console.log(`Skipping duplicate record error for ${userType} page ${currentPage}, continuing...`);
+//          }
+//          
+//          currentPage++; // Skip to next page even if this one fails
+//          return processNextPage(); // Continue with next page even if this one fails
+//        });
+//    } else {
+//      console.log(`All pages processed successfully for ${userType}!`);
+//      return Promise.resolve();
+//    }
+//  }
+//  
+//  return processNextPage();
 //}
 
 const USERNAMEK1 = process.env.USERNAME1; // ✅ Fixed: "process" not "provess"
@@ -248,26 +232,26 @@ const USERNAMEK2 = process.env.USERNAME2;
 const PASSWORD = process.env.USERPASSWORD;
 
 // Function to authenticate and process data for a specific user
-function authenticateAndProcessUser(username, userType) {
-  return authenticate(username, PASSWORD)
-    .then(ticket => {
-      console.log(`Got authentication ticket for ${userType}, getting total count...`);
-      return getTotalCount(ticket).then(totalCount => {
-        const pageSize = 10;
-        return processUserData(ticket, userType, totalCount, pageSize);
-      });
-    })
-    .catch(error => {
-      console.error(`Authentication or processing failed for ${userType}:`, error.message);
-      throw error;
-    });
-}
+//function authenticateAndProcessUser(username, userType) {
+//  return authenticate(username, PASSWORD)
+//    .then(ticket => {
+//      console.log(`Got authentication ticket for ${userType}, getting total count...`);
+//      return getTotalCount(ticket).then(totalCount => {
+//        const pageSize = 10;
+//        return processUserData(ticket, userType, totalCount, pageSize);
+//      });
+//    })
+//    .catch(error => {
+//      console.error(`Authentication or processing failed for ${userType}:`, error.message);
+//      throw error;
+//    });
+//}
 
 // Set up cleanup functions for when the app is shutting down
 
 // ...existing code...
 
-const job = schedule.scheduleJob('0 0 0 25 * *', function(){
+const job = schedule.scheduleJob('0 * * * * *', function(){
   // This runs at midnight (00:00) on the 25th day of every month
   
   // Set up logger with current date/time for this specific run
