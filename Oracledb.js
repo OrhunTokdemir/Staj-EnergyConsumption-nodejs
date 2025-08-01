@@ -66,7 +66,7 @@ async function connectOracle() {
     const connection = await oracledb.getConnection({
       user: process.env.DATABASE_USER,
       password: process.env.DATABASEPASSWORD,
-      connectString: `${process.env.DATABASE_HOST}:${process.env.DATABASE_PORT}/XEPDB1`
+      connectString: 'localhost:1521/XEPDB1' // replace XEPDB1 if your DB service name is different
     });
 
     console.log('Connected to OracleDB!');

@@ -1,3 +1,6 @@
+const axios = require('axios');
+const qs = require('qs');
+
 function authenticate(username, password) {
   let data = qs.stringify({
     'username': username,
@@ -22,6 +25,43 @@ function authenticate(username, password) {
     })
     .catch((error) => {
       console.error(`Authentication error for user ${username}:`, error.message);
+      throw error;
+    });
+}
+
+function getTotalCount(ticket) {
+  let data = JSON.stringify({
+    "periodDate": setPeriodDate(), // Use dynamic date
+    "page": {
+      "number": 1,
+      "size": 1, // We only need one record to get the total count
+      "sort": {
+        "direction": "DESC",
+        "field": "periodDate"
+      }
+    }
+  });
+
+  let config = {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: 'https://epys.epias.com.tr/demand/v1/pre-notification/supplier/query',
+    headers: { 
+      'TGT': ticket,
+      'Content-Type': 'application/json', 
+      
+    },
+    data: data
+  };
+
+  return axios.request(config)
+    .then((response) => {
+      const totalElements = response.data.body.content.page.total;
+      console.log(`Total records available: ${totalElements}`);
+      return totalElements;
+    })
+    .catch((error) => {
+      console.error('Error fetching total count:', error.message);
       throw error;
     });
 }
