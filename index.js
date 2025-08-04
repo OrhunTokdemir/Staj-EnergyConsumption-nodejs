@@ -8,8 +8,9 @@ const { insertEnergyDataOracle, closeDatabaseOracle, deleteRowsOracle } = requir
 const { sendEmail } = require('./message.js');
 const setupLogger = require('./logger.js'); // Import the logger
 const { setPeriodDate } = require('./time.js');
-
+const { authenticate, getTotalCount } = require('./authentication.js'); // Import authentication functions
 // Track the latest OracleDB connection for shutdown
+
 let lastMonthlyDb = null;
 function setLastMonthlyDb(db) {
   lastMonthlyDb = db;
@@ -38,33 +39,33 @@ process.on('SIGUSR2', handleShutdown);
 
 
 // Function to authenticate with the EPIAS API and get a ticket
-function authenticate(username, password) {
-  let data = qs.stringify({
-    'username': username,
-    'password': password 
-  });
-
-  let config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: 'https://cas.epias.com.tr/cas/v1/tickets?format=text',
-    headers: { 
-      'Content-Type': 'application/x-www-form-urlencoded', 
-      
-    },
-    data: data
-  };
-
-  return axios.request(config)
-    .then((response) => {
-      console.log(`Authentication successful for user`);
-      return response.data; // Return the ticket
-    })
-    .catch((error) => {
-      console.error(`Authentication error for user ${username}:`, error.message);
-      throw error;
-    });
-}
+//function authenticate(username, password) {
+//  let data = qs.stringify({
+//    'username': username,
+//    'password': password 
+//  });
+//
+//  let config = {
+//    method: 'post',
+//    maxBodyLength: Infinity,
+//    url: 'https://cas.epias.com.tr/cas/v1/tickets?format=text',
+//    headers: { 
+//      'Content-Type': 'application/x-www-form-urlencoded', 
+//      
+//    },
+//    data: data
+//  };
+//
+//  return axios.request(config)
+//    .then((response) => {
+//      console.log(`Authentication successful for user`);
+//      return response.data; // Return the ticket
+//    })
+//    .catch((error) => {
+//      console.error(`Authentication error for user ${username}:`, error.message);
+//      throw error;
+//    });
+//}
 
 // Function to fetch data from the API and insert it into the database
 //function fetchEnergyData(ticket,userType, pageNumber = 1, pageSize = 10) {
@@ -111,44 +112,44 @@ function authenticate(username, password) {
 //
 
 // Function to get the total count of records
-function getTotalCount(ticket) {
-  let data = JSON.stringify({
-    "periodDate": setPeriodDate(), // Use dynamic date
-    "page": {
-      "number": 1,
-      "size": 1, // We only need one record to get the total count
-      "sort": {
-        "direction": "DESC",
-        "field": "periodDate"
-      }
-    }
-  });
-
-  let config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: 'https://epys.epias.com.tr/demand/v1/pre-notification/supplier/query',
-    headers: { 
-      'TGT': ticket,
-      'Content-Type': 'application/json', 
-      
-    },
-    data: data
-  };
-
-  return axios.request(config)
-    .then((response) => {
-      const totalElements = response.data.body.content.page.total;
-      console.log(`Total records available: ${totalElements}`);
-      return totalElements;
-    })
-    .catch((error) => {
-      console.error('Error fetching total count:', error.message);
-      throw error;
-    });
-}
-
-//// Function to process all pages for a specific user
+//function getTotalCount(ticket) {
+//  let data = JSON.stringify({
+//    "periodDate": setPeriodDate(), // Use dynamic date
+//    "page": {
+//      "number": 1,
+//      "size": 1, // We only need one record to get the total count
+//      "sort": {
+//        "direction": "DESC",
+//        "field": "periodDate"
+//      }
+//    }
+//  });
+//
+//  let config = {
+//    method: 'post',
+//    maxBodyLength: Infinity,
+//    url: 'https://epys.epias.com.tr/demand/v1/pre-notification/supplier/query',
+//    headers: { 
+//      'TGT': ticket,
+//      'Content-Type': 'application/json', 
+//      
+//    },
+//    data: data
+//  };
+//
+//  return axios.request(config)
+//    .then((response) => {
+//      const totalElements = response.data.body.content.page.total;
+//      console.log(`Total records available: ${totalElements}`);
+//      return totalElements;
+//    })
+//    .catch((error) => {
+//      console.error('Error fetching total count:', error.message);
+//      throw error;
+//    });
+//}
+//
+////// Function to process all pages for a specific user
 //function processUserData(ticket, userType, totalCount, pageSize) {
 //  const totalPages = Math.ceil(totalCount / pageSize);
 //  const periodDate = setPeriodDate(); // Track the period date for this run

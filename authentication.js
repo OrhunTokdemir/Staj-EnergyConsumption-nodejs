@@ -65,3 +65,7 @@ function getTotalCount(ticket) {
       throw error;
     });
 }
+module.exports = {
+  authenticate,
+  getTotalCount
+};
