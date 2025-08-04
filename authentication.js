@@ -1,4 +1,5 @@
 const axios = require('axios');
+const setPeriodDate = require('time.js'); // Assuming this is a function that sets the period date dynamically
 const qs = require('qs');
 
 function authenticate(username, password) {
