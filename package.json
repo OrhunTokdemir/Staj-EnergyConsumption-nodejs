@@ -82,7 +82,7 @@
     "wrappy": "^1.0.2"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest"
   },
   "repository": {
     "type": "git",
@@ -94,5 +94,8 @@
   "bugs": {
     "url": "https://github.com/OrhunTokdemir/Staj-EnergyConsumption-nodejs/issues"
   },
-  "homepage": "https://github.com/OrhunTokdemir/Staj-EnergyConsumption-nodejs#readme"
+  "homepage": "https://github.com/OrhunTokdemir/Staj-EnergyConsumption-nodejs#readme",
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
 }
