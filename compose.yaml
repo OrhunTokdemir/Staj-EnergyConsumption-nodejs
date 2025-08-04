@@ -26,7 +26,8 @@ services:
     ports:
       - 3000:3000
     depends_on:
-      - oracledb
+      oracledb:
+        condition: service_healthy
 
   oracledb:
     image: gvenzl/oracle-xe
@@ -39,6 +40,12 @@ services:
       - 1521:1521
     volumes:
       - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo 'SELECT 1 FROM dual;' | sqlplus -s ${DATABASE_USER}/${DATABASEPASSWORD}@//localhost:1521/XEPDB1 | grep -q 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 2m
 
 volumes:
   oracle-data:

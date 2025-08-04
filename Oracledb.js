@@ -4,6 +4,9 @@ require('dotenv').config();
 
 async function setupOracleDatabase(){
     const connection = await connectOracle();
+    if (!connection) {
+        throw new Error('Failed to establish Oracle database connection');
+    }
     try {
         await connection.execute(`
           CREATE TABLE ENERGY_CONSUMPTION (
@@ -61,18 +64,36 @@ async function setupOracleDatabase(){
 }
 
 
-async function connectOracle() {
-  try {
-    const connection = await oracledb.getConnection({
-      user: process.env.DATABASE_USER,
-      password: process.env.DATABASEPASSWORD,
-      connectString: `${process.env.DATABASE_HOST}:${process.env.DATABASE_PORT}/XEPDB1`
-    });
+async function connectOracle(retries = 5, delay = 5000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const dbHost = process.env.DATABASE_HOST || 'localhost';
+      const dbPort = process.env.DATABASE_PORT || '1521';
+      const connectString = `${dbHost}:${dbPort}/XEPDB1`;
+      
+      console.log(`Attempting to connect to Oracle DB at: ${connectString} (attempt ${i + 1}/${retries})`);
+      
+      const connection = await oracledb.getConnection({
+        user: process.env.DATABASE_USER,
+        password: process.env.DATABASEPASSWORD,
+        connectString: connectString
+      });
 
-    console.log('Connected to OracleDB!');
-    return connection;
-  } catch (err) {
-    console.error('OracleDB connection error:', err);
+      console.log('Connected to OracleDB!');
+      return connection;
+    } catch (err) {
+      console.error(`OracleDB connection attempt ${i + 1} failed:`, err.message);
+      
+      if (i === retries - 1) {
+        // Last attempt failed, throw the error
+        console.error('All Oracle DB connection attempts failed');
+        throw err;
+      }
+      
+      // Wait before retrying
+      console.log(`Waiting ${delay/1000} seconds before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 }
 module.exports = {
